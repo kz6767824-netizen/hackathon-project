@@ -1,7 +1,5 @@
 import { callSupabaseRpc } from "@/lib/server/supabase-admin";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 type CreateLeadRow = {
   id: string;
