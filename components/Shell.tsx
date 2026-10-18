@@ -20,6 +20,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const { role, setRole } = useSession();
   const [open, setOpen] = useState(false);
+  if (path === "/login" || path === "/signup") return <>{children}</>;
   const active = (h: string) => (h === "/" ? path === "/" : path.startsWith(h));
   const links = (
     <nav className="flex flex-col gap-1 p-3">
