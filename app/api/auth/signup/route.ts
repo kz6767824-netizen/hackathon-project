@@ -7,8 +7,6 @@ import {
   isSameOriginRequest,
 } from "@/lib/server/session";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

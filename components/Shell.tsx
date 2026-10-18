@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSession } from "@/lib/hooks";
 import type { Role } from "@/lib/types";
@@ -18,8 +18,21 @@ const nav = [
 ];
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
+  const router = useRouter();
   const { role, setRole } = useSession();
   const [open, setOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  async function logout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      setLoggingOut(false);
+      router.replace("/login");
+      router.refresh();
+    }
+  }
   if (path === "/login" || path === "/signup") return <>{children}</>;
   const active = (h: string) => (h === "/" ? path === "/" : path.startsWith(h));
   const links = (
@@ -45,6 +58,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <select aria-label="Demo role" value={role} onChange={(e) => setRole(e.target.value as Role)} className="rounded-lg border border-slate-300 bg-white px-2 py-1">
               <option>Owner</option><option>Admin</option><option>User</option>
             </select>
+            <button type="button" onClick={logout} disabled={loggingOut} className="rounded-lg border border-slate-300 bg-white px-3 py-1 font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60">
+              {loggingOut ? "Logging out…" : "Log out"}
+            </button>
           </div>
         </header>
         {open && (
