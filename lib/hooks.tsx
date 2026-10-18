@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import type { Role } from "./types";
 
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[], pollMs?: number) {
@@ -19,14 +20,32 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[], pollMs?: numb
   return { data, error, loading, reload: () => run(true), retry: () => run() };
 }
 
-interface Session { role: Role; setRole: (r: Role) => void; canViewValue: boolean; meId: string }
-const Ctx = createContext<Session>({ role: "Owner", setRole: () => {}, canViewValue: true, meId: "e1" });
+interface Session { role: Role; canViewValue: boolean; meId: string; name: string; loading: boolean; error: string | null; workspaceSlug: string }
+const defaultSession: Session = { role: "User", canViewValue: false, meId: "", name: "", loading: true, error: null, workspaceSlug: "" };
+const Ctx = createContext<Session>(defaultSession);
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [role, setRoleState] = useState<Role>("Owner");
-  useEffect(() => { try { const r = localStorage.getItem("demoRole") as Role | null; if (r) setRoleState(r); } catch {} }, []);
-  const setRole = (r: Role) => { setRoleState(r); try { localStorage.setItem("demoRole", r); } catch {} };
-  // Replace with the real logged-in user + permission set from Kashif's auth
-  return <Ctx.Provider value={{ role, setRole, canViewValue: role !== "User", meId: role === "User" ? "e5" : "e1" }}>{children}</Ctx.Provider>;
+  const path = usePathname();
+  const [session, setSession] = useState<Session>(defaultSession);
+  useEffect(() => {
+    if (path === "/login" || path === "/signup" || path.startsWith("/enquiry/")) return;
+    const controller = new AbortController();
+    async function load() {
+      try {
+        const response = await fetch("/api/me", { cache: "no-store", signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Unable to load your workspace.");
+        if (!["Owner", "Admin", "User"].includes(data.role)) throw new Error("Invalid account role.");
+        setSession({ role: data.role, meId: data.id, name: data.name,
+          canViewValue: Array.isArray(data.permissions) && data.permissions.includes("view_value"),
+          loading: false, error: null, workspaceSlug: data.workspace?.slug || "" });
+      } catch (error) {
+        if (!controller.signal.aborted) setSession({ ...defaultSession, loading: false, error: error instanceof Error ? error.message : "Session unavailable." });
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, [path]);
+  return <Ctx.Provider value={session}>{children}</Ctx.Provider>;
 }
 export const useSession = () => useContext(Ctx);
 

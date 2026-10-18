@@ -21,8 +21,8 @@ export type WorkspaceMembership = {
 
 export function getSupabaseAdminConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/$/, "");
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SECRET_KEY?.trim();
+  const anonKey = (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)?.trim();
+  const serviceRoleKey = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)?.trim();
 
   if (!url || !anonKey || !serviceRoleKey) {
     throw new Error("Supabase server configuration is missing");
@@ -65,6 +65,7 @@ export async function getWorkspaceMembership(userId: string): Promise<WorkspaceM
   const response = await fetch(`${url}/rest/v1/workspace_memberships?${query}`, {
     headers: {
       apikey: serviceRoleKey,
+      ...(serviceRoleKey.startsWith("eyJ") ? { Authorization: "Bearer " + serviceRoleKey } : {}),
       Accept: "application/json",
     },
     cache: "no-store",
@@ -80,6 +81,7 @@ export async function callSupabaseRpc<T>(functionName: string, body: unknown): P
     method: "POST",
     headers: {
       apikey: serviceRoleKey,
+      ...(serviceRoleKey.startsWith("eyJ") ? { Authorization: "Bearer " + serviceRoleKey } : {}),
       "Content-Type": "application/json",
       Accept: "application/json",
     },
