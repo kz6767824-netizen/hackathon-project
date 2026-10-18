@@ -66,7 +66,7 @@ async function isValidAccessToken(
 export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/$/, "");
   const publishableKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
+    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)?.trim();
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
   const isApi = request.nextUrl.pathname.startsWith("/api/");
@@ -115,7 +115,11 @@ export async function proxy(request: NextRequest) {
         session?.access_token &&
         session.refresh_token
       ) {
-        const response = nextResponse();
+        request.cookies.set(ACCESS_COOKIE, session.access_token);
+        request.cookies.set(REFRESH_COOKIE, session.refresh_token);
+        const forwarded = new Headers(request.headers);
+        forwarded.set("cookie", request.cookies.toString());
+        const response = NextResponse.next({ request: { headers: forwarded } });
         setSessionCookies(response, session);
         return response;
       }

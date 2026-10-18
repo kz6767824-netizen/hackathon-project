@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/server/session";
 
 
 export async function GET() {
+  await connection();
   try {
     const context = await getAuthContext();
 

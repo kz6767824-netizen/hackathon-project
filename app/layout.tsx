@@ -9,7 +9,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="bg-slate-50 text-slate-900 antialiased">
-        <SessionProvider><ToastProvider><Suspense fallback={null}><Shell>{children}</Shell></Suspense></ToastProvider></SessionProvider>
+        <Suspense fallback={<p className="p-8">Loading…</p>}><SessionProvider><ToastProvider><Shell>{children}</Shell></ToastProvider></SessionProvider></Suspense>
       </body>
     </html>
   );
