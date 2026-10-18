@@ -1,9 +1,8 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { useSession } from "@/lib/hooks";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
 import type { Role } from "@/lib/types";
 import { cx } from "./ui";
 
@@ -19,52 +18,9 @@ const nav = [
 ];
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const router = useRouter();
   const { role, setRole } = useSession();
   const [open, setOpen] = useState(false);
-  const [authStatus, setAuthStatus] = useState<"loading" | "authenticated" | "unauthenticated">(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-      ? "loading"
-      : "unauthenticated",
-  );
-  const authPage = path === "/login" || path === "/signup";
-
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      if (!authPage) router.replace("/login");
-      return;
-    }
-
-    let active = true;
-    void supabase.auth.getSession().then(({ data, error }) => {
-      if (!active) return;
-      if (error) {
-        setAuthStatus("unauthenticated");
-        return;
-      }
-      setAuthStatus(data.session ? "authenticated" : "unauthenticated");
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthStatus(session ? "authenticated" : "unauthenticated");
-    });
-
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
-  }, [authPage, path, router]);
-
-  useEffect(() => {
-    if (authStatus === "loading") return;
-    if (authPage && authStatus === "authenticated") router.replace("/");
-    if (!authPage && authStatus === "unauthenticated") router.replace("/login");
-  }, [authPage, authStatus, router]);
-
-  if (authStatus === "loading") return null;
-  if (authPage) return authStatus === "authenticated" ? null : <>{children}</>;
-  if (authStatus !== "authenticated") return null;
-
+  if (path === "/login" || path === "/signup") return <>{children}</>;
   const active = (h: string) => (h === "/" ? path === "/" : path.startsWith(h));
   const links = (
     <nav className="flex flex-col gap-1 p-3">

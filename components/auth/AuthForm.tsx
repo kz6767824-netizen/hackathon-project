@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
@@ -24,6 +23,8 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
     }
     locked.current = true;
     setBusy(true); setError(""); setNotice("");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const payload = {
         email: String(values.get("email") ?? "").trim(),
@@ -36,46 +37,36 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       if (signup && (!payload.fullName || !payload.workspaceName)) {
         throw new Error("Enter your name and workspace name.");
       }
-      const supabase = getSupabaseBrowserClient();
-      if (!supabase) {
-        throw new Error("Supabase is not configured. Add the project URL and publishable key to .env.local, then restart the dev server.");
+      const response = await fetch("/api/auth/" + mode, {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload), signal: controller.signal
+      });
+      if (response.status === 404 || response.status === 405 || response.status === 503) {
+        throw new Error("Sign-in service is not available yet. Please try again later.");
       }
-
-      if (signup) {
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email: payload.email,
-          password: payload.password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: {
-              full_name: payload.fullName,
-              workspace_name: payload.workspaceName,
-            },
-          },
-        });
-        if (signUpError) throw signUpError;
-        if (!data.session) {
-          form.reset();
-          setNotice("Account created. Check your email to confirm your address, then log in.");
-          return;
-        }
-      } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: payload.email,
-          password: payload.password,
-        });
-        if (signInError) throw signInError;
+      const result: unknown = await response.json().catch(() => null);
+      const data = result && typeof result === "object"
+        ? result as Record<string, unknown> : {};
+      if (!response.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Unable to continue. Check your details and try again.");
       }
-
-      if (!signup || (await supabase.auth.getSession()).data.session) {
-        router.replace("/");
-        router.refresh();
+      if (signup && data.requiresEmailConfirmation === true) {
+        form.reset();
+        setNotice("Check your email to confirm your account, then return to log in.");
         return;
       }
+      if (data.authenticated !== true) {
+        throw new Error("The server did not confirm a signed-in session. Please try again.");
+      }
+      router.replace("/");
+      router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to continue. Please try again.");
+      setError(err instanceof Error && err.name === "AbortError"
+        ? "The request timed out. Please try again."
+        : err instanceof Error ? err.message : "Connection failed. Please try again.");
     } finally {
-      locked.current = false; setBusy(false);
+      clearTimeout(timeout); locked.current = false; setBusy(false);
     }
   }
 
